@@ -21,7 +21,7 @@ export class GameManager {
 
   newGame(playerName) {
     this.player.reset();
-    if (playerName) this.player.name = `召唤师：${playerName}`;
+    if (playerName) this.player.name = `ID：${playerName}`;
     this.gameOver = false;
     this.actionLocked = false;
     this.resetDayStats();
@@ -29,7 +29,7 @@ export class GameManager {
     this.ui.refresh(this.player);
     this.ui.setScene(this.getDayIntro());
     this.ui.addLog('info', `第 1 天开始，当前 ${this.player.getRank().name}，30天冲王者！`);
-    this.saveGame();
+    this.save.clear();
   }
 
   loadGame() {
@@ -48,6 +48,47 @@ export class GameManager {
 
   saveGame() { this.save.save(this.player.toJSON()); }
   hasSave() { return this.save.hasSave(); }
+  hasAnySave() { return this.save.hasAnySave(); }
+
+  saveToSlot(slotId) {
+    this.save.saveToSlot(slotId, this.player.toJSON());
+    this.ui.addLog('good', `已保存到存档 ${slotId}`);
+  }
+
+  loadFromSlot(slotId) {
+    let data;
+    if (slotId === 'auto') {
+      data = this.save.load();
+    } else {
+      data = this.save.loadFromSlot(slotId);
+    }
+    if (!data) return false;
+    this.player.fromJSON(data);
+    this.gameOver = false;
+    this.actionLocked = false;
+    this.resetDayStats();
+    this.dayStats.startRank = this.player.rankIndex;
+    this.ui.refresh(this.player);
+    this.ui.setScene(this.getDayIntro());
+    this.ui.addLog('info', slotId === 'auto' ? '自动存档已加载。' : `存档 ${slotId} 已加载。`);
+    return true;
+  }
+
+  deleteSlot(slotId) {
+    this.save.deleteSlot(slotId);
+  }
+
+  getAllSlots() {
+    return this.save.getAllSlots();
+  }
+
+  openSavePanel() {
+    if (this.gameOver) return;
+    this.actionLocked = true;
+    this.ui.showSavePanel(this, () => {
+      this.actionLocked = false;
+    });
+  }
 
   getDayIntro() {
     const rank = this.player.getRank();
@@ -67,8 +108,8 @@ export class GameManager {
       desc = `⚠️ 已透支 ${overtime}h，身体越来越吃不消了...`;
     }
     const timeDisplay = this.player.timeLeft >= 0
-      ? `剩余 ${this.player.timeLeft}h`
-      : `透支 ${Math.abs(this.player.timeLeft)}h`;
+      ? `⏰ 行动时间剩余 ${this.player.timeLeft}h`
+      : `⏰ 行动时间透支 ${Math.abs(this.player.timeLeft)}h`;
     return {
       title: `📅 第 ${this.player.day}/${this.player.maxDays} 天 · ${timeDisplay}`,
       text: `${rank.emoji} ${rank.name} · ${this.player.name}\n${desc}`,
@@ -84,6 +125,11 @@ export class GameManager {
       return;
     }
 
+    if (actionId === 'save') {
+      this.openSavePanel();
+      return;
+    }
+
     if (actionId === 'sleep') {
       this.doSleep();
       return;
@@ -96,8 +142,10 @@ export class GameManager {
     if (willOvertime) {
       this.actionLocked = true;
       const overtimeAfter = Math.abs(this.player.timeLeft - cost);
-      const hpPen = 3 + Math.floor(overtimeAfter * 2);
-      const combatPen = 1 + Math.floor(overtimeAfter);
+      let hpPen, combatPen;
+      if (overtimeAfter >= 6) { hpPen = 8; combatPen = 3; }
+      else if (overtimeAfter >= 3) { hpPen = 5; combatPen = 2; }
+      else { hpPen = 3; combatPen = 1; }
       this.ui.showOvertimeConfirm(overtimeAfter, hpPen, combatPen, () => {
         this.actionLocked = false;
         this.executeAction(actionId, cost);
@@ -129,17 +177,30 @@ export class GameManager {
 
     if (this.player.timeLeft < 0) {
       const overtime = this.player.getOvertimeHours();
-      const hpPenalty = 3 + Math.floor(overtime * 2);
-      const combatPenalty = 1 + Math.floor(overtime);
+      let hpPenalty, combatPenalty, moralePenalty = 0, tierMsg;
+      if (overtime >= 6) {
+        hpPenalty = 8; combatPenalty = 3; moralePenalty = 5;
+        tierMsg = '💀 严重透支';
+      } else if (overtime >= 3) {
+        hpPenalty = 5; combatPenalty = 2;
+        tierMsg = '😵 中度透支';
+      } else {
+        hpPenalty = 3; combatPenalty = 1;
+        tierMsg = '🥱 轻度透支';
+      }
       this.player.hp -= hpPenalty;
       this.player.combat -= combatPenalty;
+      this.player.morale -= moralePenalty;
       this.player.clampStats();
       this.dayStats.overtimeActions++;
 
       if (!result.changes) result.changes = {};
       result.changes.hp = (result.changes.hp || 0) - hpPenalty;
       result.changes.combat = (result.changes.combat || 0) - combatPenalty;
-      result.text += `\n\n⚠️ 透支中！精力 -${hpPenalty}，技术 -${combatPenalty}`;
+      if (moralePenalty > 0) result.changes.morale = (result.changes.morale || 0) - moralePenalty;
+      let penText = `精力-${hpPenalty} 技术-${combatPenalty}`;
+      if (moralePenalty > 0) penText += ` 心态-${moralePenalty}`;
+      result.text += `\n\n⚠️ ${tierMsg}（${overtime}h）！${penText}`;
     }
 
     if (actionId === 'challenge') {
@@ -171,16 +232,14 @@ export class GameManager {
         this.ui.addLog('bad', `⬇️ 掉段至 ${result.newRank.emoji} ${result.newRank.name}`);
       }
 
-      if (result.triggerEvent) {
-        const evt = this.events.rollEvent();
-        if (evt) {
-          this.ui.showEvent(evt, (choice) => {
-            this.resolveEventChoice(evt, choice, () => {
-              this.afterAction();
-            });
+      const evt = this.events.rollEvent(actionId);
+      if (evt) {
+        this.ui.showEvent(evt, (choice) => {
+          this.resolveEventChoice(evt, choice, () => {
+            this.afterAction();
           });
-          return;
-        }
+        });
+        return;
       }
 
       this.afterAction();
@@ -204,7 +263,6 @@ export class GameManager {
     this.ui.refresh(this.player);
     this.ui.setScene(this.getDayIntro());
     this.actionLocked = false;
-    this.saveGame();
   }
 
   doSleep() {
@@ -245,6 +303,8 @@ export class GameManager {
       nextDayEffect,
     ].filter(Boolean).join('\n');
 
+    this.saveGame();
+
     this.ui.showDaySummary(summaryLines, () => {
       this.player.advanceDay(overtime);
       this.resetDayStats();
@@ -268,7 +328,6 @@ export class GameManager {
       this.ui.refresh(this.player);
       this.ui.setScene(this.getDayIntro());
       this.actionLocked = false;
-      this.saveGame();
     });
   }
 
@@ -278,16 +337,60 @@ export class GameManager {
         this.ui.addLog('bad', '金币不足！');
         return false;
       }
+
+      if (item.lottery) {
+        return this.handleLottery(item);
+      }
+
       this.player.gold -= item.price;
       const changes = this.player.applyEffects(item.effects);
       changes.gold = (changes.gold || 0) - item.price;
       this.ui.refresh(this.player);
       this.ui.addLog('good', `购买了${item.name}！`);
       this.addChangesLog(changes);
-      return true;
+      return { item, changes };
     }, () => {
       this.actionLocked = false;
     });
+  }
+
+  handleLottery(item) {
+    this.player.gold -= item.price;
+    const roll = Math.random();
+    let reward, msg, type;
+
+    if (roll < 0.005) {
+      reward = { gold: 300, morale: 30, combat: 10, danger: -10 };
+      msg = '🎰 头奖！！！金光闪闪！你简直是欧皇附体！';
+      type = 'good';
+    } else if (roll < 0.02) {
+      reward = { gold: 150, morale: 20, combat: 5 };
+      msg = '🎰 特等奖！运气爆棚，大赚一笔！';
+      type = 'good';
+    } else if (roll < 0.07) {
+      reward = { gold: 80, morale: 10 };
+      msg = '🎰 一等奖！今天手气真不错！';
+      type = 'good';
+    } else if (roll < 0.17) {
+      reward = { gold: 40 };
+      msg = '🎰 二等奖！小赚一笔~';
+      type = 'good';
+    } else if (roll < 0.35) {
+      reward = { gold: 15 };
+      msg = '🎰 回本了，不亏不赚。';
+      type = 'info';
+    } else {
+      reward = {};
+      msg = '🎰 没中奖...谢谢惠顾，下次一定！';
+      type = 'bad';
+    }
+
+    const changes = this.player.applyEffects(reward);
+    changes.gold = (changes.gold || 0) - item.price;
+    this.ui.refresh(this.player);
+    this.ui.addLog(type, msg);
+    if (Object.keys(changes).length > 0) this.addChangesLog(changes);
+    return { item: { ...item, name: msg }, changes, lottery: true, lotteryType: type };
   }
 
   resolveEventChoice(evt, choice, callback) {
@@ -298,22 +401,16 @@ export class GameManager {
       const won = Math.random() < winRate;
 
       if (won) {
-        const reward = {};
-        if (evt.id === 'tournament') { reward.gold = 50; reward.morale = 10; }
-        else if (evt.id === 'rival') { reward.morale = 15; reward.combat = 5; }
-        else { reward.gold = 25; reward.morale = 5; }
+        const reward = choice.winEffects || { gold: 25, morale: 5 };
         const changes = this.player.applyEffects(reward);
         this.ui.refresh(this.player);
-        this.ui.addLog('good', `对局胜利！`);
+        this.ui.addLog('good', choice.winText || '对局胜利！');
         this.addChangesLog(changes);
       } else {
-        const penalty = {};
-        if (evt.id === 'tournament') { penalty.hp = -25; penalty.morale = -15; }
-        else if (evt.id === 'rival') { penalty.morale = -20; }
-        else { penalty.hp = -20; penalty.morale = -10; }
+        const penalty = choice.loseEffects || { hp: -20, morale: -10 };
         const changes = this.player.applyEffects(penalty);
         this.ui.refresh(this.player);
-        this.ui.addLog('bad', `对局失败...`);
+        this.ui.addLog('bad', choice.loseText || '对局失败...');
         this.addChangesLog(changes);
       }
       callback();

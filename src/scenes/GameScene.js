@@ -10,6 +10,7 @@ export class GameScene extends Phaser.Scene {
   init(data) {
     this.isContinue = data?.continue || false;
     this.playerName = data?.playerName || '';
+    this.slotId = data?.slotId || 'auto';
   }
 
   create() {
@@ -17,8 +18,8 @@ export class GameScene extends Phaser.Scene {
     this.ui = new GameUI(container, (actionId) => this.gm.doAction(actionId));
     this.gm = new GameManager(this.ui);
 
-    if (this.isContinue && this.gm.hasSave()) {
-      this.gm.loadGame();
+    if (this.isContinue && this.gm.hasAnySave()) {
+      this.gm.loadFromSlot(this.slotId);
     } else {
       this.gm.newGame(this.playerName);
     }

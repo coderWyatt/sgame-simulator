@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import { SaveManager } from '../systems/SaveManager.js';
+import { getRankByIndex } from '../data/ranks.js';
 
 export class MenuScene extends Phaser.Scene {
   constructor() {
@@ -6,11 +8,12 @@ export class MenuScene extends Phaser.Scene {
   }
 
   create() {
+    this.saveManager = new SaveManager();
     this.createMenuDOM();
   }
 
   createMenuDOM() {
-    const hasSave = !!localStorage.getItem('wz_sim_save');
+    const hasSave = this.saveManager.hasAnySave();
     this.menuOverlay = document.createElement('div');
     this.menuOverlay.className = 'menu-overlay';
     this.menuOverlay.innerHTML = `
@@ -23,7 +26,58 @@ export class MenuScene extends Phaser.Scene {
     document.getElementById('game-container').appendChild(this.menuOverlay);
 
     this.menuOverlay.querySelector('#btn-new-game').addEventListener('click', () => this.showNameInput());
-    this.menuOverlay.querySelector('#btn-continue').addEventListener('click', () => this.startGame(true));
+    this.menuOverlay.querySelector('#btn-continue').addEventListener('click', () => this.showLoadPanel());
+  }
+
+  showLoadPanel() {
+    this.loadOverlay = document.createElement('div');
+    this.loadOverlay.className = 'name-overlay';
+
+    const slots = this.saveManager.getAllSlots().filter(s => s.meta);
+
+    if (slots.length === 1 && slots[0].id === 'auto') {
+      this.startGame(true, 'auto');
+      return;
+    }
+
+    const slotCards = slots.map(s => {
+      const rank = getRankByIndex(s.meta.rankIndex);
+      const timeStr = s.meta.timestamp ? new Date(s.meta.timestamp).toLocaleString('zh-CN', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+      const isAuto = s.id === 'auto';
+      const displayLabel = isAuto ? `自动·第${s.meta.day}天` : s.label;
+      return `
+        <button class="menu-load-slot" data-id="${s.id}">
+          <span class="mls-label">${displayLabel}</span>
+          <span class="mls-info">${s.meta.name || '召唤师'} · 第${s.meta.day}天 · ${rank.emoji} ${rank.name}</span>
+          <span class="mls-time">${timeStr}</span>
+        </button>`;
+    }).join('');
+
+    this.loadOverlay.innerHTML = `
+      <div class="name-card" style="max-width:340px;">
+        <div class="name-card-emoji">📂</div>
+        <div class="name-card-title">选择存档</div>
+        <div class="menu-load-list">${slotCards}</div>
+        <button class="name-confirm-btn menu-load-back">← 返回</button>
+      </div>
+    `;
+    document.getElementById('game-container').appendChild(this.loadOverlay);
+    requestAnimationFrame(() => this.loadOverlay.classList.add('visible'));
+
+    this.loadOverlay.querySelectorAll('.menu-load-slot').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.loadOverlay.classList.remove('visible');
+        setTimeout(() => {
+          this.loadOverlay.remove();
+          this.startGame(true, btn.dataset.id);
+        }, 300);
+      });
+    });
+
+    this.loadOverlay.querySelector('.menu-load-back').addEventListener('click', () => {
+      this.loadOverlay.classList.remove('visible');
+      setTimeout(() => this.loadOverlay.remove(), 300);
+    });
   }
 
   showNameInput() {
@@ -34,9 +88,12 @@ export class MenuScene extends Phaser.Scene {
         <div class="name-card-emoji">⚔️</div>
         <div class="name-card-title">创建你的召唤师</div>
         <div class="name-card-sub">请输入你的ID</div>
-        <div class="name-input-wrap">
-          <span class="name-input-prefix">召唤师</span>
-          <input type="text" class="name-input" maxlength="12" placeholder="输入ID..." autocomplete="off" />
+        <div class="name-input-row">
+          <div class="name-input-wrap">
+            <span class="name-input-prefix">召唤师</span>
+            <input type="text" class="name-input" maxlength="12" placeholder="输入ID..." autocomplete="off" />
+          </div>
+          <button class="name-random-btn" title="随机取名">🎲</button>
         </div>
         <div class="name-input-hint">2~12个字符，支持中英文和数字</div>
         <button class="name-confirm-btn" disabled>开始冲王者 →</button>
@@ -47,10 +104,18 @@ export class MenuScene extends Phaser.Scene {
 
     const input = this.nameOverlay.querySelector('.name-input');
     const btn = this.nameOverlay.querySelector('.name-confirm-btn');
+    const randomBtn = this.nameOverlay.querySelector('.name-random-btn');
 
     input.addEventListener('input', () => {
       const val = input.value.trim();
       btn.disabled = val.length < 2;
+    });
+
+    randomBtn.addEventListener('click', () => {
+      input.value = this.getRandomName();
+      input.dispatchEvent(new Event('input'));
+      randomBtn.classList.add('spin');
+      setTimeout(() => randomBtn.classList.remove('spin'), 400);
     });
 
     const confirm = () => {
@@ -131,7 +196,7 @@ export class MenuScene extends Phaser.Scene {
           <div class="intro-section">
             <div class="intro-section-title">四、每日行动</div>
             <div class="intro-actions-list">
-              <div class="intro-act-row"><span class="act-emoji">🏆</span><span class="act-label">排位</span><span class="act-effect">3h · 胜→升段+金币15~34 / 败→掉段+精力-15~24 心态-8~15 · 沉迷+3~6</span></div>
+              <div class="intro-act-row"><span class="act-emoji">🏆</span><span class="act-label">排位</span><span class="act-effect">3h · 胜→金币15~34 / 败→精力-15~24 心态-8~15 · 沉迷+3~6</span></div>
               <div class="intro-act-row"><span class="act-emoji">🎯</span><span class="act-label">训练</span><span class="act-effect">2h · 技术+5~12 · 金币-15</span></div>
               <div class="intro-act-row"><span class="act-emoji">📺</span><span class="act-label">观赛</span><span class="act-effect">2h · 技术+3~7 · 沉迷+5~10 · 触发随机事件</span></div>
               <div class="intro-act-row"><span class="act-emoji">💼</span><span class="act-label">代练</span><span class="act-effect">2h · 金币+30~50 · 沉迷+8~13 · 精力-5~10</span></div>
@@ -171,9 +236,26 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
-  startGame(isContinue) {
+  getRandomName() {
+    const prefixes = [
+      '峡谷', '暴走', '无敌', '超神', '王者', '荣耀', '暗影', '疾风', '星辰',
+      '绝世', '龙魂', '烈焰', '冰封', '天命', '至尊', '孤影', '逆风', '破晓',
+      '月下', '深渊', '风暴', '铁血', '狂战', '寒冰', '追风',
+    ];
+    const suffixes = [
+      '剑客', '射手', '法王', '战神', '刺客', '大佬', '猎手', '守护',
+      '少年', '高手', '小白', '菜鸟', '奶爸', '萌新', '老六', '打野王',
+      '上分人', '躺赢哥', '翻盘王', '带飞侠', '补刀怪', '走位秀',
+    ];
+    const p = prefixes[Math.floor(Math.random() * prefixes.length)];
+    const s = suffixes[Math.floor(Math.random() * suffixes.length)];
+    const num = Math.random() < 0.4 ? Math.floor(Math.random() * 100) : '';
+    return `${p}${s}${num}`;
+  }
+
+  startGame(isContinue, slotId) {
     this.cleanupDOM();
-    this.scene.start('GameScene', { continue: isContinue, playerName: this.playerName || '' });
+    this.scene.start('GameScene', { continue: isContinue, playerName: this.playerName || '', slotId: slotId || 'auto' });
   }
 
   cleanupDOM() {

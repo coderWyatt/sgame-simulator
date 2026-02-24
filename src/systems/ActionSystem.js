@@ -67,7 +67,6 @@ export class ActionSystem {
       title: '📺 观赛',
       text: texts[Math.floor(Math.random() * texts.length)],
       changes: { combat: combatGain, danger: dangerGain },
-      triggerEvent: true,
     };
   }
 
