@@ -167,7 +167,7 @@ export class MenuScene extends Phaser.Scene {
             <div style="font-size:12px;color:var(--text-sub);line-height:1.7;margin-bottom:8px;">
               每天有 <b>10小时</b> 可支配时间，每个行动消耗不同时长。<br>
               可以<b style="color:var(--red)">透支</b>到最多24h，但会损失精力和技术！<br>
-              点 <b style="color:#6366f1">🌙 睡觉</b> 结束当天，按时休息恢复状态。
+              点 <b style="color:#3b82f6">🌙 睡觉</b> 结束当天，按时休息恢复状态。
             </div>
             <div class="intro-res-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
               <div class="intro-res"><span class="res-icon">😴</span><span class="res-name">不透支</span><span class="res-desc">精力+15 心态+5</span></div>

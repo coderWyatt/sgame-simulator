@@ -53,11 +53,6 @@ export class GameUI {
     this.root.className = 'sim-root';
 
     this.root.innerHTML = `
-      <div class="sim-brand">
-        <span class="brand-line"></span>
-        <span class="brand-text">🎮 排位模拟器</span>
-        <span class="brand-line"></span>
-      </div>
       <div class="scene-card">
         <div class="scene-title-row">
           <div class="scene-title"></div>
@@ -111,10 +106,11 @@ export class GameUI {
 
   buildStatBars() {
     this.statEls = {};
-    this.els.stats.innerHTML = '<div class="stats-title">📊 召唤师状态</div>';
+    this.els.stats.innerHTML = '<div class="stats-header"><span class="stats-title">📊 召唤师状态</span><span class="stats-rank-badge"></span></div>';
+    this.rankBadge = this.els.stats.querySelector('.stats-rank-badge');
     for (const s of STAT_DEFS) {
       const row = document.createElement('div');
-      row.className = 'stat-row';
+      row.className = `stat-row ${s.cls}-row`;
       const maxLabel = typeof s.max === 'number' ? s.max : '';
       row.innerHTML = `
         <div class="stat-head">
@@ -176,6 +172,9 @@ export class GameUI {
       this.els.timeBar.classList.remove('overtime');
       this.els.timeBar.classList.toggle('low', player.timeLeft <= 2);
     }
+
+    const rank = player.getRank();
+    this.rankBadge.textContent = `${rank.emoji} ${rank.name}`;
 
     for (const s of STAT_DEFS) {
       const val = player[s.key] || 0;
@@ -429,7 +428,7 @@ export class GameUI {
             <div style="font-size:12px;color:var(--text-sub);line-height:1.7;margin-bottom:8px;">
               每天有 <b>10小时</b> 可支配时间，每个行动消耗不同时长。<br>
               可以<b style="color:var(--red)">透支</b>到最多24h，但会损失精力和技术！<br>
-              点 <b style="color:#6366f1">🌙 睡觉</b> 结束当天，按时休息恢复状态。
+              点 <b style="color:#3b82f6">🌙 睡觉</b> 结束当天，按时休息恢复状态。
             </div>
             <div class="intro-res-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
               <div class="intro-res"><span class="res-icon">😴</span><span class="res-name">不透支</span><span class="res-desc">精力+15 心态+5</span></div>
