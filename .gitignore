@@ -1,0 +1,5 @@
+node_modules/
+dist/
+.DS_Store
+*.local
+stuck-test-1-start.png
