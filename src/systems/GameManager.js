@@ -324,7 +324,15 @@ export class GameManager {
         this.ui.addLog('info', '白银段位解锁了「匹配」行动！');
       }
 
-      this.ui.addLog('info', `第 ${this.player.day} 天开始，可用 ${this.player.timeLeft}h`);
+      // 新的一天状态概述和建议
+      const dayStartSummary = this.generateDayStartSummary();
+      this.ui.addLog('info', dayStartSummary.brief);
+      if (dayStartSummary.suggestions.length > 0) {
+        dayStartSummary.suggestions.forEach(suggestion => {
+          this.ui.addLog('info', suggestion);
+        });
+      }
+      
       this.ui.refresh(this.player);
       this.ui.setScene(this.getDayIntro());
       this.actionLocked = false;
@@ -489,5 +497,89 @@ export class GameManager {
       const cls = isGood && !isBad ? 'good' : isBad && !isGood ? 'bad' : 'info';
       this.ui.addLog(cls, parts.join('，'));
     }
+  }
+
+  generateDayStartSummary() {
+    const suggestions = [];
+    const rank = this.player.getRank();
+    const daysLeft = this.player.maxDays - this.player.day + 1;
+    const rankDistance = 18 - this.player.rankIndex;
+    
+    // 状态评估
+    const hpStatus = this.player.hp < 30 ? 'critical' : this.player.hp < 50 ? 'low' : this.player.hp < 70 ? 'medium' : 'good';
+    const moraleStatus = this.player.morale < 30 ? 'critical' : this.player.morale < 50 ? 'low' : this.player.morale < 70 ? 'medium' : 'good';
+    const combatStatus = this.player.combat < 30 ? 'low' : this.player.combat < 60 ? 'medium' : 'good';
+    const dangerStatus = this.player.danger >= 70 ? 'critical' : this.player.danger >= 50 ? 'high' : this.player.danger >= 30 ? 'medium' : 'low';
+    const goldStatus = this.player.gold < 20 ? 'low' : this.player.gold < 50 ? 'medium' : 'good';
+
+    // 生成简要概述
+    const statusEmojis = {
+      hp: hpStatus === 'critical' ? '🔴' : hpStatus === 'low' ? '🟡' : '🟢',
+      morale: moraleStatus === 'critical' ? '🔴' : moraleStatus === 'low' ? '🟡' : '🟢',
+      combat: combatStatus === 'low' ? '🟡' : '🟢',
+      danger: dangerStatus === 'critical' ? '🔴' : dangerStatus === 'high' ? '🟡' : '🟢',
+      gold: goldStatus === 'low' ? '🟡' : '🟢'
+    };
+
+    const brief = `第 ${this.player.day} 天开始，可用 ${this.player.timeLeft}h · ` +
+      `${statusEmojis.hp}精力${this.player.hp} ` +
+      `${statusEmojis.morale}心态${this.player.morale} ` +
+      `${statusEmojis.combat}技术${this.player.combat} ` +
+      `${statusEmojis.danger}沉迷${this.player.danger} ` +
+      `${statusEmojis.gold}金币${this.player.gold}`;
+
+    // 生成建议
+    // 精力建议
+    if (hpStatus === 'critical') {
+      suggestions.push('⚠️ 精力严重不足！强烈建议休息或小憩，否则游戏结束风险极高！');
+    } else if (hpStatus === 'low') {
+      suggestions.push('💪 精力偏低，建议优先休息恢复，避免透支影响后续行动。');
+    }
+
+    // 心态建议
+    if (moraleStatus === 'critical') {
+      suggestions.push('😰 心态崩溃边缘！建议小憩或看比赛放松，连续失败可能导致游戏结束！');
+    } else if (moraleStatus === 'low') {
+      suggestions.push('😊 心态偏低，可以通过匹配或小憩来调整心情。');
+    }
+
+    // 沉迷度建议
+    if (dangerStatus === 'critical') {
+      suggestions.push('🚨 沉迷度过高！必须立即休息或处理现实事务，否则手机会被没收！');
+    } else if (dangerStatus === 'high') {
+      suggestions.push('⚠️ 沉迷度较高，建议适当休息，平衡游戏与生活。');
+    }
+
+    // 技术建议
+    if (combatStatus === 'low') {
+      suggestions.push('🎯 技术较低，建议多训练提升操作水平，增加排位胜率。');
+    }
+
+    // 金币建议
+    if (goldStatus === 'low') {
+      suggestions.push('💰 金币不足，可以考虑代练赚钱，但要注意精力消耗。');
+    }
+
+    // 段位进展建议
+    if (rankDistance > 0) {
+      const daysPerRank = daysLeft / rankDistance;
+      if (daysPerRank < 1) {
+        suggestions.push(`⏰ 时间紧迫！剩余 ${daysLeft} 天需升 ${rankDistance} 段，平均每天需升 ${rankDistance / daysLeft} 段，建议全力以赴排位！`);
+      } else if (daysPerRank < 2) {
+        suggestions.push(`📊 进度正常，剩余 ${daysLeft} 天需升 ${rankDistance} 段，保持稳定发挥。`);
+      } else {
+        suggestions.push(`✨ 进度领先！剩余 ${daysLeft} 天需升 ${rankDistance} 段，可以稳健发育。`);
+      }
+    } else {
+      suggestions.push('👑 已达王者段位！继续保持！');
+    }
+
+    // 综合建议（根据当前整体状态）
+    const criticalCount = [hpStatus, moraleStatus, dangerStatus].filter(s => s === 'critical').length;
+    if (criticalCount >= 2) {
+      suggestions.push('🏥 警告：多个关键状态处于危险水平，今天务必优先恢复状态！');
+    }
+
+    return { brief, suggestions };
   }
 }

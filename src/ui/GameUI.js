@@ -53,15 +53,23 @@ export class GameUI {
     this.root.className = 'sim-root';
 
     this.root.innerHTML = `
-      <div class="scene-card">
-        <div class="scene-title-row">
-          <div class="scene-title"></div>
-          <div class="scene-time-bar"><div class="scene-time-fill"></div></div>
-        </div>
-        <div class="scene-text"></div>
+      <div class="sim-topbar">
+        <span class="topbar-accent"></span>
+        <span class="topbar-logo">🎮</span>
+        <span class="topbar-title">排位模拟器</span>
+        <span class="topbar-dot">·</span>
+        <span class="topbar-sub">RANK SIMULATOR</span>
+        <span class="topbar-ver">v1.0</span>
       </div>
       <div class="sim-stats"></div>
       <div class="sim-scroll">
+        <div class="scene-card">
+          <div class="scene-title-row">
+            <div class="scene-title"></div>
+            <div class="scene-time-bar"><div class="scene-time-fill"></div></div>
+          </div>
+          <div class="scene-text"></div>
+        </div>
         <div class="sim-actions"></div>
         <div class="sim-log-section">
           <div class="sim-log-header">
