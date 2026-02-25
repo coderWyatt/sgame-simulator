@@ -7,7 +7,7 @@ export const RANDOM_EVENTS = [
     title: '队友挂机！',
     text: '你排到一把排位，结果有个队友开局就挂机了！4v5！',
     choices: [
-      { text: '😤 坚持打完', hint: '技术判定，胜：金币+25 心态+10，败：精力-20 心态-10', action: 'fight', difficulty: 0.6, winEffects: { gold: 25, morale: 10 }, loseEffects: { hp: -20, morale: -10 } },
+      { text: '😤 坚持打完', hint: '技术判定，胜：金币+40 心态+10，败：精力-20 心态-10', action: 'fight', difficulty: 0.6, winEffects: { gold: 40, morale: 10 }, loseEffects: { hp: -20, morale: -10 } },
       { text: '😮‍💨 认了算了', hint: '心态-5，但省精力', action: 'ok', effects: { morale: -5 } }
     ]
   },
@@ -133,7 +133,7 @@ export const RANDOM_EVENTS = [
     title: '城市赛报名！',
     text: '本地正在举办王者荣耀城市赛，冠军有丰厚奖金！',
     choices: [
-      { text: '🏆 报名参赛', hint: '高难度，胜：金币+50 心态+10，败：精力-25 心态-15', action: 'fight', difficulty: 0.65, winEffects: { gold: 50, morale: 10 }, loseEffects: { hp: -25, morale: -15 } },
+      { text: '🏆 报名参赛', hint: '高难度，胜：金币+80 心态+10，败：精力-25 心态-15', action: 'fight', difficulty: 0.65, winEffects: { gold: 80, morale: 10 }, loseEffects: { hp: -25, morale: -15 } },
       { text: '👀 去当观众', hint: '技术+5', action: 'ok', effects: { combat: 5 } }
     ]
   },
@@ -258,7 +258,7 @@ export const RANDOM_EVENTS = [
     title: '客户好评！',
     text: '代练的客户对你的表现非常满意，给了额外的小费！',
     choices: [
-      { text: '😊 开心收下', hint: '金币+20，心态+5', action: 'ok', effects: { gold: 20, morale: 5 } }
+      { text: '😊 开心收下', hint: '金币+30，心态+5', action: 'ok', effects: { gold: 30, morale: 5 } }
     ]
   },
   {
@@ -269,7 +269,7 @@ export const RANDOM_EVENTS = [
     text: '代练时系统弹出了异常检测提示，差点被封号！你吓出一身冷汗...',
     choices: [
       { text: '😰 赶紧停手', hint: '沉迷度-5，心态-10', action: 'ok', effects: { danger: -5, morale: -10 } },
-      { text: '🤫 小心继续', hint: '沉迷度+10，金币+15', action: 'ok', effects: { danger: 10, gold: 15 } }
+      { text: '🤫 小心继续', hint: '沉迷度+10，金币+25', action: 'ok', effects: { danger: 10, gold: 25 } }
     ]
   },
   {
@@ -279,7 +279,7 @@ export const RANDOM_EVENTS = [
     title: '接到大单！',
     text: '有人出高价要你帮忙从白银打到钻石，但工作量不小...',
     choices: [
-      { text: '💼 接下来', hint: '金币+40，精力-15，沉迷度+8', action: 'ok', effects: { gold: 40, hp: -15, danger: 8 } },
+      { text: '💼 接下来', hint: '金币+60，精力-15，沉迷度+8', action: 'ok', effects: { gold: 60, hp: -15, danger: 8 } },
       { text: '🙅 太累了拒绝', hint: '心态+3', action: 'ok', effects: { morale: 3 } }
     ]
   },
@@ -302,7 +302,7 @@ export const RANDOM_EVENTS = [
     title: '登录奖励！',
     text: '系统发了一波福利，你领到了丰厚的登录奖励！',
     choices: [
-      { text: '🎉 开心收下', hint: '金币+20~40', action: 'ok', effects: { gold: [20, 40] } },
+      { text: '🎉 开心收下', hint: '金币+30~60', action: 'ok', effects: { gold: [30, 60] } },
     ]
   },
   {
@@ -359,7 +359,7 @@ export const RANDOM_EVENTS = [
     title: '礼包码！',
     text: '你在社交媒体上刷到了一个官方礼包兑换码！',
     choices: [
-      { text: '🎁 赶紧兑换', hint: '金币+15，精力+5', action: 'ok', effects: { gold: 15, hp: 5 } }
+      { text: '🎁 赶紧兑换', hint: '金币+25，精力+5', action: 'ok', effects: { gold: 25, hp: 5 } }
     ]
   },
   {

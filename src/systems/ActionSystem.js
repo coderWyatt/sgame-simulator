@@ -1,3 +1,6 @@
+import { getHeroById } from '../data/heroes.js';
+import { getDifficulty } from '../data/difficulty.js';
+
 const ACTION_COSTS = {
   train: 2,
   explore: 2,
@@ -8,8 +11,22 @@ const ACTION_COSTS = {
   shop: 0,
 };
 
-export function getActionCost(id) {
-  return ACTION_COSTS[id] || 0;
+export function getActionCost(id, player) {
+  let cost = ACTION_COSTS[id] || 0;
+  if (player && cost > 0) {
+    const timeSave = player.getTalentEffect('timeSave');
+    if (timeSave > 0) cost = Math.max(1, cost - timeSave);
+  }
+  return cost;
+}
+
+function applyBoost(base, player, key) {
+  const hero = getHeroById(player.heroId);
+  let mult = 1;
+  if (hero.bonus[key]) mult += hero.bonus[key];
+  const talentVal = player.getTalentEffect(key);
+  if (talentVal) mult += talentVal;
+  return Math.round(base * mult);
 }
 
 export class ActionSystem {
@@ -18,8 +35,12 @@ export class ActionSystem {
   }
 
   train() {
-    const combatGain = 5 + Math.floor(Math.random() * 8);
-    const goldCost = 15;
+    const diff = getDifficulty(this.player.difficultyId);
+    let combatGain = 5 + Math.floor(Math.random() * 8);
+    combatGain = applyBoost(combatGain, this.player, 'trainBoost');
+    combatGain = applyBoost(combatGain, this.player, 'combatGainBoost');
+    combatGain = Math.round(combatGain * diff.combatGainMult);
+    const goldCost = Math.round(15 * diff.trainCostMult);
     const learnSkill = Math.random() < 0.15;
 
     this.player.combat += combatGain;
@@ -50,8 +71,13 @@ export class ActionSystem {
   }
 
   explore() {
-    const combatGain = 3 + Math.floor(Math.random() * 5);
-    const dangerGain = 5 + Math.floor(Math.random() * 6);
+    const diff = getDifficulty(this.player.difficultyId);
+    let combatGain = 3 + Math.floor(Math.random() * 5);
+    combatGain = applyBoost(combatGain, this.player, 'combatGainBoost');
+    combatGain = Math.round(combatGain * diff.combatGainMult);
+    let dangerGain = 5 + Math.floor(Math.random() * 6);
+    dangerGain = applyBoost(dangerGain, this.player, 'dangerMult');
+    dangerGain = Math.round(dangerGain * diff.dangerMult);
 
     this.player.combat += combatGain;
     this.player.danger += dangerGain;
@@ -71,24 +97,85 @@ export class ActionSystem {
   }
 
   challenge() {
+    const diff = getDifficulty(this.player.difficultyId);
     const rank = this.player.getRank();
     const expectedCombat = 10 + this.player.rankIndex * 8;
     const combatRatio = this.player.combat / Math.max(1, expectedCombat);
     const techFactor = Math.pow(Math.min(combatRatio, 2), 1.5);
     const moraleBonus = (this.player.morale - 50) * 0.001;
-    const winRate = Math.max(0.1, Math.min(0.85, techFactor * 0.55 + 0.1 + moraleBonus));
+
+    // Hero + talent + friend win rate boosts
+    const hero = getHeroById(this.player.heroId);
+    let extraWinRate = hero.bonus.winRateBoost || 0;
+    extraWinRate += this.player.getTalentEffect('winRateBoost');
+
+    // Friend bonus
+    let friendBonus = 0;
+    let friendCombatBonus = 0;
+    let friendMoraleBonus = 0;
+    let friendGoldBonus = 0;
+    let friendDangerExtra = 0;
+    const activeFriend = this.player.activeFriendId
+      ? this.player.friends.find(f => f.id === this.player.activeFriendId)
+      : null;
+    if (activeFriend) {
+      friendBonus = activeFriend.bonus.winRateBoost || 0;
+      friendCombatBonus = activeFriend.bonus.combatBonus || 0;
+      friendMoraleBonus = activeFriend.bonus.moraleBonus || 0;
+      friendGoldBonus = activeFriend.bonus.goldBonus || 0;
+      friendDangerExtra = activeFriend.dangerExtra || 0;
+    }
+
+    // Streak bonus
+    let streakBonus = 0;
+    if (this.player.winStreak >= 5) streakBonus = 0.05;
+    else if (this.player.winStreak >= 3) streakBonus = 0.03;
+
+    // Lose streak protection
+    let loseProtect = false;
+    if (this.player.loseStreak >= 3) loseProtect = true;
+
+    const baseWinRate = techFactor * 0.55 + 0.1 + moraleBonus;
+    const winRate = Math.max(0.1, Math.min(0.88, baseWinRate + extraWinRate + friendBonus + streakBonus + diff.winRateBonus));
     const won = Math.random() < winRate;
 
-    const dangerGain = 3 + Math.floor(Math.random() * 4);
+    let dangerGain = 3 + Math.floor(Math.random() * 4);
+    dangerGain = applyBoost(dangerGain, this.player, 'dangerMult');
+    dangerGain = Math.round(dangerGain * diff.dangerMult);
+    dangerGain += friendDangerExtra;
     this.player.danger += dangerGain;
 
+    const rewardMult = 1 + this.player.getTalentEffect('rankRewardMult') - 1 + this.player.getTalentEffect('allGainBoost');
+    const penaltyMult = 1 + this.player.getTalentEffect('rankPenaltyMult') - 1;
+
     if (won) {
-      const hpCost = 8 + Math.floor(Math.random() * 5);
-      const goldGain = 15 + Math.floor(Math.random() * 20);
-      const combatGain = Math.random() < 0.3 ? Math.floor(Math.random() * 3) + 1 : 0;
+      let hpCost = 8 + Math.floor(Math.random() * 5);
+      hpCost = applyBoost(hpCost, this.player, 'hpCostMult');
+      hpCost = Math.round(hpCost * diff.hpCostMult);
+      let goldGain = 22 + Math.floor(Math.random() * 24);
+      goldGain = applyBoost(goldGain, this.player, 'goldBoost');
+      goldGain = Math.round(goldGain * rewardMult * diff.goldMult) + friendGoldBonus;
+      const combatGain = Math.random() < 0.3 ? Math.floor(Math.random() * 3) + 1 + friendCombatBonus : friendCombatBonus;
+
+      // Streak bonus gold
+      let streakGold = 0;
+      if (this.player.winStreak >= 2) {
+        streakGold = Math.min(this.player.winStreak * 8, 48);
+      }
+      goldGain += streakGold;
+
       this.player.hp -= hpCost;
       this.player.gold += goldGain;
       this.player.combat += combatGain;
+      if (friendMoraleBonus > 0) this.player.morale += friendMoraleBonus;
+
+      // Update streaks
+      this.player.winStreak++;
+      this.player.loseStreak = 0;
+      this.player.totalWins++;
+      if (this.player.winStreak > this.player.maxWinStreak) {
+        this.player.maxWinStreak = this.player.winStreak;
+      }
 
       const oldRank = rank.name;
       this.player.promote();
@@ -97,28 +184,46 @@ export class ActionSystem {
 
       const changes = { hp: -hpCost, gold: goldGain, danger: dangerGain };
       if (combatGain > 0) changes.combat = combatGain;
+      if (friendMoraleBonus > 0) changes.morale = friendMoraleBonus;
 
       const texts = [
         `排位赛大胜！你在${rank.tier}局中carry全场！`,
         `MVP！队友疯狂点赞，你在${rank.tier}又赢了一把！`,
         `完美团战！你的操作带领团队拿下了胜利！`,
       ];
+      let resultText = `${texts[Math.floor(Math.random() * texts.length)]}\n⬆️ ${oldRank} → ${newRank.emoji} ${newRank.name}`;
+      if (this.player.winStreak >= 3) resultText += `\n🔥 ${this.player.winStreak}连胜！额外金币 +${streakGold}`;
+      if (activeFriend) resultText += `\n🤝 ${activeFriend.icon} ${activeFriend.name}：「${activeFriend.lines.win}」`;
+
       return {
         title: '🏆 排位胜利！',
-        text: `${texts[Math.floor(Math.random() * texts.length)]}\n⬆️ ${oldRank} → ${newRank.emoji} ${newRank.name}`,
+        text: resultText,
         changes,
         won: true,
         rankChanged: true,
         newRank,
       };
     } else {
-      const hpLoss = 15 + Math.floor(Math.random() * 10);
-      const moraleLoss = 8 + Math.floor(Math.random() * 8);
+      let hpLoss = 15 + Math.floor(Math.random() * 10);
+      let moraleLoss = 8 + Math.floor(Math.random() * 8);
+      moraleLoss = Math.round(moraleLoss * (1 + this.player.getTalentEffect('lossMoraleMult') - 1) * diff.moraleLossMult);
+      hpLoss = Math.round(hpLoss * penaltyMult * diff.hpCostMult);
+
       this.player.hp -= hpLoss;
       this.player.morale -= moraleLoss;
 
+      // Update streaks
+      this.player.winStreak = 0;
+      this.player.loseStreak++;
+
+      // Lose streak protection: 50% chance not to demote
       const oldRank = rank.name;
-      const demoted = this.player.demote();
+      let demoted;
+      if (loseProtect && Math.random() < 0.5) {
+        demoted = false;
+      } else {
+        demoted = this.player.demote();
+      }
       const newRank = this.player.getRank();
       this.player.clampStats();
 
@@ -130,9 +235,14 @@ export class ActionSystem {
       let resultText = texts[Math.floor(Math.random() * texts.length)];
       if (demoted) {
         resultText += `\n⬇️ ${oldRank} → ${newRank.emoji} ${newRank.name}`;
+      } else if (loseProtect && this.player.rankIndex > 0) {
+        resultText += `\n🛡️ 连败保护触发，段位不变！`;
       } else {
         resultText += `\n🛡️ 最低段位保护，段位不变。`;
       }
+      if (this.player.loseStreak >= 3) resultText += `\n😰 ${this.player.loseStreak}连败中...`;
+      if (activeFriend) resultText += `\n🤝 ${activeFriend.icon} ${activeFriend.name}：「${activeFriend.lines.lose}」`;
+
       return {
         title: '💔 排位失败',
         text: resultText,
@@ -145,9 +255,14 @@ export class ActionSystem {
   }
 
   rest() {
-    const hpGain = 10 + Math.floor(Math.random() * 8);
-    const moraleGain = 5 + Math.floor(Math.random() * 5);
-    const dangerDrop = 5 + Math.floor(Math.random() * 4);
+    const diff = getDifficulty(this.player.difficultyId);
+    let hpGain = 10 + Math.floor(Math.random() * 8);
+    hpGain = Math.round(hpGain * diff.restBonus);
+    let moraleGain = 5 + Math.floor(Math.random() * 5);
+    moraleGain = applyBoost(moraleGain, this.player, 'restMoraleMult');
+    moraleGain = applyBoost(moraleGain, this.player, 'moraleGainMult');
+    moraleGain = Math.round(moraleGain * diff.restBonus);
+    let dangerDrop = 5 + Math.floor(Math.random() * 4);
 
     this.player.hp += hpGain;
     this.player.morale += moraleGain;
@@ -168,9 +283,14 @@ export class ActionSystem {
   }
 
   spar() {
-    const combatGain = 3 + Math.floor(Math.random() * 3);
+    const diff = getDifficulty(this.player.difficultyId);
+    let combatGain = 3 + Math.floor(Math.random() * 3);
+    combatGain = applyBoost(combatGain, this.player, 'combatGainBoost');
+    combatGain = Math.round(combatGain * diff.combatGainMult);
     const moraleGain = 3;
-    const dangerGain = 2 + Math.floor(Math.random() * 3);
+    let dangerGain = 2 + Math.floor(Math.random() * 3);
+    dangerGain = applyBoost(dangerGain, this.player, 'dangerMult');
+    dangerGain = Math.round(dangerGain * diff.dangerMult);
 
     this.player.combat += combatGain;
     this.player.morale += moraleGain;
@@ -190,9 +310,16 @@ export class ActionSystem {
   }
 
   boost() {
-    const goldGain = 30 + Math.floor(Math.random() * 21);
-    const dangerGain = 8 + Math.floor(Math.random() * 6);
-    const hpCost = 5 + Math.floor(Math.random() * 6);
+    const diff = getDifficulty(this.player.difficultyId);
+    let goldGain = 40 + Math.floor(Math.random() * 26);
+    goldGain = applyBoost(goldGain, this.player, 'goldBoost');
+    goldGain = Math.round(goldGain * diff.goldMult);
+    let dangerGain = 8 + Math.floor(Math.random() * 6);
+    dangerGain = applyBoost(dangerGain, this.player, 'dangerMult');
+    dangerGain = Math.round(dangerGain * diff.dangerMult);
+    let hpCost = 5 + Math.floor(Math.random() * 6);
+    hpCost = applyBoost(hpCost, this.player, 'hpCostMult');
+    hpCost = Math.round(hpCost * diff.hpCostMult);
     const combatGain = Math.random() < 0.25 ? Math.floor(Math.random() * 3) + 1 : 0;
 
     this.player.gold += goldGain;

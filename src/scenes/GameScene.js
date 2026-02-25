@@ -11,6 +11,7 @@ export class GameScene extends Phaser.Scene {
     this.isContinue = data?.continue || false;
     this.playerName = data?.playerName || '';
     this.slotId = data?.slotId || 'auto';
+    this.difficulty = data?.difficulty || 'hard';
   }
 
   create() {
@@ -21,7 +22,7 @@ export class GameScene extends Phaser.Scene {
     if (this.isContinue && this.gm.hasAnySave()) {
       this.gm.loadFromSlot(this.slotId);
     } else {
-      this.gm.newGame(this.playerName);
+      this.gm.newGame(this.playerName, this.difficulty);
     }
 
     this.ui.show();

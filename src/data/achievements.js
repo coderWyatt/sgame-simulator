@@ -1,0 +1,17 @@
+export const ACHIEVEMENTS = [
+  { id: 'first_win',      icon: '🏅', name: '初露锋芒',   desc: '赢得第一场排位',       reward: { gold: 30 } },
+  { id: 'win_streak_3',   icon: '🔥', name: '三连胜',     desc: '连续赢得3场排位',       reward: { gold: 50, morale: 10 } },
+  { id: 'win_streak_5',   icon: '💥', name: '五连胜',     desc: '连续赢得5场排位',       reward: { gold: 80, combat: 5 } },
+  { id: 'reach_silver',   icon: '🥈', name: '白银选手',   desc: '段位达到白银',          reward: { gold: 40 } },
+  { id: 'reach_gold',     icon: '🥇', name: '黄金战士',   desc: '段位达到黄金',          reward: { gold: 60 } },
+  { id: 'reach_plat',     icon: '💎', name: '铂金精英',   desc: '段位达到铂金',          reward: { gold: 80, combat: 3 } },
+  { id: 'reach_diamond',  icon: '💠', name: '钻石王牌',   desc: '段位达到钻石',          reward: { gold: 100, combat: 5 } },
+  { id: 'reach_star',     icon: '🌟', name: '星耀传说',   desc: '段位达到星耀',          reward: { gold: 120, combat: 8 } },
+  { id: 'rich_500',       icon: '💰', name: '小富翁',     desc: '金币累计超过500',        reward: { morale: 15, gold: 20 } },
+  { id: 'combat_100',     icon: '🎯', name: '技术大师',   desc: '技术值超过100',          reward: { gold: 60 } },
+  { id: 'no_loss_day',    icon: '🛡️', name: '完美一天',   desc: '一天内排位全胜（至少2场）', reward: { gold: 50, morale: 10 } },
+  { id: 'survivor',       icon: '❤️', name: '绝处逢生',   desc: '精力低于10时存活到下一天',  reward: { hp: 20, gold: 20 } },
+  { id: 'shopaholic',     icon: '🛍️', name: '购物狂',     desc: '累计购买10次商品',       reward: { gold: 40 } },
+  { id: 'night_owl',      icon: '🦉', name: '夜猫子',     desc: '累计透支10次',           reward: { combat: 3, gold: 20 } },
+  { id: 'zen_master',     icon: '🧘', name: '心如止水',   desc: '心态保持100持续3天',      reward: { combat: 5, gold: 50 } },
+];

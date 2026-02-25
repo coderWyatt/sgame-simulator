@@ -1,6 +1,6 @@
 import { getRankByIndex } from '../data/ranks.js';
+import { getDifficulty } from '../data/difficulty.js';
 
-const MAX_DAYS = 30;
 const BASE_TIME = 10;
 
 export class PlayerManager {
@@ -8,23 +8,53 @@ export class PlayerManager {
     this.reset();
   }
 
-  reset() {
+  reset(difficultyId) {
+    const diff = getDifficulty(difficultyId || this.difficultyId || 'hard');
+    this.difficultyId = diff.id;
     this.name = '召唤师';
     this.emoji = '🪄';
     this.hp = 100;
     this.maxHp = 100;
-    this.combat = 10;
+    this.combat = diff.startCombat;
     this.morale = 80;
-    this.gold = 50;
+    this.gold = diff.startGold;
     this.danger = 0;
 
     this.rankIndex = 0;
     this.day = 1;
-    this.maxDays = MAX_DAYS;
+    this.maxDays = diff.maxDays;
     this.timeLeft = BASE_TIME;
     this.baseTime = BASE_TIME;
 
     this.sparUnlocked = false;
+
+    // 英雄系统
+    this.heroId = 'warrior';
+    this.unlockedHeroes = ['warrior'];
+
+    // 成就系统
+    this.achievements = [];
+    this.totalWins = 0;
+    this.totalShopBuys = 0;
+    this.totalOvertimes = 0;
+    this.morale100Days = 0;
+
+    // 连胜/连败
+    this.winStreak = 0;
+    this.loseStreak = 0;
+    this.maxWinStreak = 0;
+
+    // 天赋系统
+    this.talents = [];
+    this.talentTiersClaimed = [];
+
+    // 好友系统
+    this.friends = [];
+    this.activeFriendId = null;
+
+    // 赛季任务
+    this.dailyQuests = [];
+    this.completedQuestIds = [];
   }
 
   getRank() {
@@ -66,18 +96,7 @@ export class PlayerManager {
   advanceDay(overtimeHours) {
     this.day++;
 
-    if (overtimeHours >= 6) {
-      this.hp -= 20;
-      this.combat -= 5;
-      this.morale -= 10;
-    } else if (overtimeHours >= 3) {
-      this.hp -= 10;
-      this.combat -= 3;
-      this.morale -= 5;
-    } else if (overtimeHours > 0) {
-      this.hp -= 5;
-      this.combat -= 1;
-    } else {
+    if (overtimeHours <= 0) {
       this.hp = Math.min(this.maxHp, this.hp + 15);
       this.morale = Math.min(100, this.morale + 5);
     }
@@ -118,6 +137,7 @@ export class PlayerManager {
 
   toJSON() {
     return {
+      difficultyId: this.difficultyId,
       name: this.name, emoji: this.emoji,
       hp: this.hp, maxHp: this.maxHp,
       combat: this.combat,
@@ -126,11 +146,52 @@ export class PlayerManager {
       day: this.day, maxDays: this.maxDays,
       timeLeft: this.timeLeft, baseTime: this.baseTime,
       sparUnlocked: this.sparUnlocked,
+      heroId: this.heroId,
+      unlockedHeroes: this.unlockedHeroes,
+      achievements: this.achievements,
+      totalWins: this.totalWins,
+      totalShopBuys: this.totalShopBuys,
+      totalOvertimes: this.totalOvertimes,
+      morale100Days: this.morale100Days,
+      winStreak: this.winStreak,
+      loseStreak: this.loseStreak,
+      maxWinStreak: this.maxWinStreak,
+      talents: this.talents,
+      talentTiersClaimed: this.talentTiersClaimed,
+      friends: this.friends,
+      activeFriendId: this.activeFriendId,
+      dailyQuests: this.dailyQuests,
+      completedQuestIds: this.completedQuestIds,
     };
   }
 
   fromJSON(data) {
     Object.assign(this, data);
+    if (!this.difficultyId) this.difficultyId = 'hard';
+    if (!this.unlockedHeroes) this.unlockedHeroes = ['warrior'];
+    if (!this.heroId) this.heroId = 'warrior';
+    if (!this.achievements) this.achievements = [];
+    if (!this.talents) this.talents = [];
+    if (!this.talentTiersClaimed) this.talentTiersClaimed = [];
+    if (!this.friends) this.friends = [];
+    if (!this.dailyQuests) this.dailyQuests = [];
+    if (!this.completedQuestIds) this.completedQuestIds = [];
     this.clampStats();
+  }
+
+  getTalentEffect(key) {
+    let total = 0;
+    for (const t of this.talents) {
+      if (t.effect && t.effect[key] !== undefined) total += t.effect[key];
+    }
+    return total;
+  }
+
+  hasTalent(key) {
+    return this.getTalentEffect(key) !== 0;
+  }
+
+  getDiff() {
+    return getDifficulty(this.difficultyId);
   }
 }
